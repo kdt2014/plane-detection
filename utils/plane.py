@@ -24,7 +24,9 @@ def fit_plane(pts):
     if n[2] < 0:
         n = -n
     return n, c
-
+# 这个方法本质上是使用主成分分析（PCA）来找到最能代表这些点的平面。
+# 最小主成分（对应最小奇异值）的方向就是平面的法向量，而所有点的平均位置就是平面上的一个点（质心）。
+# 这种方法在处理有噪声的实际数据时特别有用，因为它能找到最佳拟合平面，即使点并不完全共面。
 
 def project_on_plane(pts, n, c):
     """Project points onto a 2D plane.
@@ -38,8 +40,8 @@ def project_on_plane(pts, n, c):
       pts_new: points projected onto the plane [point_count, 3]
 
     """
-    t = (np.dot(c, n) - np.dot(pts, n)) / np.dot(n, n)
-    pts_new = pts + np.matmul(np.expand_dims(t, axis=1), np.expand_dims(n, axis=0))
+    t = (np.dot(c, n) - np.dot(pts, n)) / np.dot(n, n)  # 计算每个点到平面的距离 这里使用了点到平面距离的公式：距离 = (平面上一点与法向量的点积 - 待投影点与法向量的点积) / 法向量的模长平方
+    pts_new = pts + np.matmul(np.expand_dims(t, axis=1), np.expand_dims(n, axis=0)) # 将原始点沿着法向量方向移动计算出的距离，从而得到投影点
     return pts_new
 
 
@@ -62,7 +64,8 @@ def fit_line(pts):
     if d[0] < 0:
         d = -d
     return d, c
-
+# 这个方法本质上也是使用主成分分析（PCA）来找到最能代表这些点的直线。
+# 最大主成分（对应最大奇异值）的方向就是直线的方向向量，而所有点的平均位置就是直线上的一个点。
 
 def extract_tform(landmarks, plane_name):
     """Compute the transformation that maps the reference xy-plane at origin to the GT standard plane.
@@ -103,18 +106,18 @@ def extract_tform(landmarks, plane_name):
         csp = landmarks[12]
 
         # Compute transformation
-        csp_cl = cl - csp
+        csp_cl = cl - csp  # 两点确定一个向量
         csp_cr = cr - csp
-        z_vec = np.cross(csp_cl, csp_cr)
-        z_vec = geometry.unit_vector(z_vec)
+        z_vec = np.cross(csp_cl, csp_cr)   # 叉乘得到法向量
+        z_vec = geometry.unit_vector(z_vec)  # 平面单位法向量
         cr_cl_mid = (cr + cl) / 2.0
         x_vec = geometry.unit_vector(cr_cl_mid - csp)
         y_vec = geometry.unit_vector(np.cross(z_vec, x_vec))
 
         # 4x4 transformation matrix
         mat = np.eye(4)
-        mat[:3, :3] = np.vstack((x_vec, y_vec, z_vec)).transpose()
-        mat[:3, 3] = (cr_cl_mid + csp) / 2.0
+        mat[:3, :3] = np.vstack((x_vec, y_vec, z_vec)).transpose()  # 左上角3*3 赋值得到旋转部分，完整变化矩阵4*4
+        mat[:3, 3] = (cr_cl_mid + csp) / 2.0  # 平移变换到 中点，新的坐标系的原点
         # Quaternions and translation vector
         quat = geometry.quaternion_from_matrix(mat[:3, :3])
         trans_vec = mat[:3, 3]
@@ -157,10 +160,10 @@ def init_mesh_by_plane(mesh_siz, normal):
             mesh: mesh coordinates of identity plane. [4, num_mesh_points]
 
     """
-    mesh_r = (mesh_siz - 1) / 2
+    mesh_r = (mesh_siz - 1) / 2    # 计算了从中心到边缘的距离
     x_lin = np.linspace(-mesh_r[0], mesh_r[0], mesh_siz[0])
-    y_lin = np.linspace(-mesh_r[1], mesh_r[1], mesh_siz[1])
-    xy_coords = np.meshgrid(y_lin, x_lin)
+    y_lin = np.linspace(-mesh_r[1], mesh_r[1], mesh_siz[1])   # 均匀分布的 x 和 y 坐标，最大最小值是半径
+    xy_coords = np.meshgrid(y_lin, x_lin)  # meshgrid 函数创建了 2D 网格坐标。
     if normal=='z':
         xyz_coords = np.vstack([xy_coords[1].reshape(-1),
                                 xy_coords[0].reshape(-1),
@@ -213,7 +216,7 @@ def extract_plane_from_mesh(image, mesh, mesh_siz, order):
     # Set image matrix corner as origin
     img_siz = np.array(image.shape)
     img_c = (img_siz-1)/2.0
-    mesh_new = mesh[:3, :] + np.expand_dims(img_c, axis=1)
+    mesh_new = mesh[:3, :] + np.expand_dims(img_c, axis=1)  # 将图像每个像素的x,y,z坐标分别加上x,y,z方向的半径。因此将图像的坐标原点移动到了图像的边角
 
     # Reshape coordinates
     x_coords = mesh_new[0, :].reshape(mesh_siz)
@@ -246,10 +249,11 @@ def extract_plane_from_mesh_batch(image, meshes, mesh_siz, order):
     mesh_count = meshes.shape[0]
     meshes_new = meshes[:, :3, :] + img_c[np.newaxis, :, np.newaxis]    # meshes_new = [mesh_count, 4, num_mesh_pts]
     meshes_new = np.reshape(np.transpose(meshes_new, (1, 0, 2))[:3], (3, mesh_count, mesh_siz[0], mesh_siz[1]))      # [3, mesh_count, plane_siz[0], plane_siz[1]]
+# 最终得到一个多维数组，3个 3维数组， 3维数组3*255*221， 代表三个平面的x坐标值， 三个平面的y坐标值 三个平面的z坐标值
 
     # Extract image plane
     slices = scipy.ndimage.map_coordinates(image, meshes_new, order=order)
-    meshes_new = np.transpose(meshes_new, (1, 2, 3, 0))
+    meshes_new = np.transpose(meshes_new, (1, 2, 3, 0))  # [mesh_count, mesh_siz[0], mesh_siz[1], 3] 许多图像处理和机器学习库期望数据格式
     return slices, meshes_new
 
 
