@@ -147,7 +147,7 @@ def init_mesh(mesh_siz):
                             np.zeros(mesh_siz[0] * mesh_siz[1]),
                             np.ones(mesh_siz[0] * mesh_siz[1])])
     return xyz_coords
-
+# 创建了一个中心在原点，平行于xy平面的初始平面， 因为z=0，所以在xy平面，并且x,y关于原点对称
 
 def init_mesh_by_plane(mesh_siz, normal):
     """Initialise identity plane with a fixed size. Either xy, xz or yz-plane
@@ -280,8 +280,8 @@ def extract_plane_from_mesh_ortho_batch(image, meshes, mesh_siz, order):
     meshes_new = np.reshape(np.transpose(meshes_new, (2, 0, 1, 3))[:3], (3, mesh_count, input_plane, mesh_siz[0], mesh_siz[1]))      # [3, mesh_count, mesh_ind, plane_siz[0], plane_siz[1]]
 
     # Extract image plane
-    slices = scipy.ndimage.map_coordinates(image, meshes_new, order=order)
-    meshes_new = np.transpose(meshes_new, (1, 2, 3, 4, 0))
+    slices = scipy.ndimage.map_coordinates(image, meshes_new, order=order) # 形状为[mesh_count, mesh_ind, plane_siz[0], plane_siz[1]]
+    meshes_new = np.transpose(meshes_new, (1, 2, 3, 4, 0))  # 形状为[mesh_count, mesh_ind, plane_siz[0], plane_siz[1], 3]
     return slices, meshes_new
 
 
